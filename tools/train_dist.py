@@ -89,6 +89,8 @@ def main():
 
         logger.info(pprint.pformat(args))
         logger.info(pprint.pformat(config))
+    else:
+        final_output_dir, tb_log_dir = None, None
 
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
@@ -97,11 +99,12 @@ def main():
 
     model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(
         config)
+    model = model.cuda()
 
     if to_output:
         dump_input = torch.rand(
             (1, 3, config.MODEL.IMAGE_SIZE[1], config.MODEL.IMAGE_SIZE[0])
-        )
+        ).cuda()
         logger.info(get_model_summary(model, dump_input))
 
         # copy model file
@@ -156,6 +159,7 @@ def main():
     # Data loading code
     traindir = os.path.join(config.DATASET.ROOT, config.DATASET.TRAIN_SET)
     valdir = os.path.join(config.DATASET.ROOT, config.DATASET.TEST_SET)
+    print(traindir, valdir)
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -172,7 +176,7 @@ def main():
     train_sampler = DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU, 
+        batch_size=1,#config.TRAIN.BATCH_SIZE_PER_GPU, 
         shuffle=False,
         sampler=train_sampler,
         num_workers=config.WORKERS,
@@ -192,7 +196,7 @@ def main():
     val_sampler = DistributedSampler(val_dataset, shuffle=False)
     valid_loader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
+        batch_size=1,#config.TEST.BATCH_SIZE_PER_GPU,
         sampler=val_sampler,
         shuffle=False,
         num_workers=config.WORKERS,

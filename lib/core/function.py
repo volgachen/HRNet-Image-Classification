@@ -20,22 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 # reduce loss like in maskrcnn, however i am not sure about this function. It is not utilize yet.
-def reduce_loss(loss_dict):
+def reduce_loss(loss):
   world_size = torch.distributed.get_world_size()
   if world_size < 2:
     return loss
   with torch.no_grad():
-    loss_names = []
-    all_losses = []
-    for k in sorted(loss_dict.keys()):
-      loss_names.append(k)
-      all_losses.append(loss_dict[k])
-    all_losses = torch.stack(all_losses, dim=0)
-    torch.distributed.reduce(all_losses, dst = 0)
+    reduce_loss = loss
+    torch.distributed.reduce(reduce_loss, dst = 0)
     if torch.distributed.get_rank() == 0:
-      all_losses /= world_size
-    reduced_losses = {k:v for k,v in zip(loss_names, all_losses)}
-  return reduced_losses
+      reduce_loss /= world_size
+  return reduce_loss
 
 
 def train(config, train_loader, model, criterion, optimizer, epoch,
@@ -57,11 +51,11 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         #target = target - 1 # Specific for imagenet
 
         # compute output
+        input = input.cuda()
         output = model(input)
         target = target.cuda(non_blocking=True)
 
         loss = criterion(output, target)
-        reduced_loss = reduce_loss(loss)
 
         # compute gradient and do update step
         optimizer.zero_grad()
@@ -69,6 +63,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         optimizer.step()
 
         # measure accuracy and record loss
+        loss = reduce_loss(loss)
         losses.update(loss.item(), input.size(0))
 
         prec1, prec5 = accuracy(output, target, (1, 5))

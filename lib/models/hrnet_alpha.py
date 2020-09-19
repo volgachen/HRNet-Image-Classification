@@ -910,8 +910,8 @@ def get_cls_net(num_layers, **kwargs):
   cfg.defrost()
   cfg.merge_from_file(config_file)
   cfg.freeze()
-  kwargs["alpha_file"]="/userhome/ctnet_model/v2.pth"
-  kwargs["alpha_thr"]=0.5
+  kwargs["alpha_file"]="/home/yszhu3/github/ctnet_new/exp/ctdet+entropy/coco_hrnetlink_0829entropy10/alpha_last.pth"#"/userhome/ctnet_model/v2.pth"
+  kwargs["alpha_thr"]=0.0
   model = HighResolutionNet(cfg['MODEL']['EXTRA'], cfg['MODEL']['SEARCH'], **kwargs)
   
   if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:

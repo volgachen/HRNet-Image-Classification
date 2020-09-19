@@ -70,3 +70,8 @@ MODEL:
       wh: 2
       reg: 2
     HEAD_CONV: 64
+DATASET:
+  ROOT: /home/data
+  TRAIN_SET: train
+  TEST_SET: val
+  DATASET: ILSVRC2015
