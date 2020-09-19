@@ -19,8 +19,27 @@ from core.evaluate import accuracy
 logger = logging.getLogger(__name__)
 
 
+# reduce loss like in maskrcnn, however i am not sure about this function. It is not utilize yet.
+def reduce_loss(loss_dict):
+  world_size = torch.distributed.get_world_size()
+  if world_size < 2:
+    return loss
+  with torch.no_grad():
+    loss_names = []
+    all_losses = []
+    for k in sorted(loss_dict.keys()):
+      loss_names.append(k)
+      all_losses.append(loss_dict[k])
+    all_losses = torch.stack(all_losses, dim=0)
+    torch.distributed.reduce(all_losses, dst = 0)
+    if torch.distributed.get_rank() == 0:
+      all_losses /= world_size
+    reduced_losses = {k:v for k,v in zip(loss_names, all_losses)}
+  return reduced_losses
+
+
 def train(config, train_loader, model, criterion, optimizer, epoch,
-          output_dir, tb_log_dir, writer_dict):
+          output_dir, tb_log_dir, writer_dict=None, to_output=True):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -42,6 +61,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         target = target.cuda(non_blocking=True)
 
         loss = criterion(output, target)
+        reduced_loss = reduce_loss(loss)
 
         # compute gradient and do update step
         optimizer.zero_grad()
@@ -60,7 +80,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % config.PRINT_FREQ == 0:
+        if i % config.PRINT_FREQ == 0 and to_output:
             msg = 'Epoch: [{0}][{1}/{2}]\t' \
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
@@ -82,7 +102,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
 
 
 def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
-             writer_dict=None):
+             writer_dict=None, to_output=True):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -111,22 +131,23 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
             batch_time.update(time.time() - end)
             end = time.time()
 
-        msg = 'Test: Time {batch_time.avg:.3f}\t' \
-              'Loss {loss.avg:.4f}\t' \
-              'Error@1 {error1:.3f}\t' \
-              'Error@5 {error5:.3f}\t' \
-              'Accuracy@1 {top1.avg:.3f}\t' \
-              'Accuracy@5 {top5.avg:.3f}\t'.format(
-                  batch_time=batch_time, loss=losses, top1=top1, top5=top5,
-                  error1=100-top1.avg, error5=100-top5.avg)
-        logger.info(msg)
+        if to_output:
+            msg = 'Test: Time {batch_time.avg:.3f}\t' \
+                  'Loss {loss.avg:.4f}\t' \
+                  'Error@1 {error1:.3f}\t' \
+                  'Error@5 {error5:.3f}\t' \
+                  'Accuracy@1 {top1.avg:.3f}\t' \
+                  'Accuracy@5 {top5.avg:.3f}\t'.format(
+                      batch_time=batch_time, loss=losses, top1=top1, top5=top5,
+                      error1=100-top1.avg, error5=100-top5.avg)
+            logger.info(msg)
 
-        if writer_dict:
-            writer = writer_dict['writer']
-            global_steps = writer_dict['valid_global_steps']
-            writer.add_scalar('valid_loss', losses.avg, global_steps)
-            writer.add_scalar('valid_top1', top1.avg, global_steps)
-            writer_dict['valid_global_steps'] = global_steps + 1
+            if writer_dict:
+                writer = writer_dict['writer']
+                global_steps = writer_dict['valid_global_steps']
+                writer.add_scalar('valid_loss', losses.avg, global_steps)
+                writer.add_scalar('valid_top1', top1.avg, global_steps)
+                writer_dict['valid_global_steps'] = global_steps + 1
 
     return top1.avg
 
