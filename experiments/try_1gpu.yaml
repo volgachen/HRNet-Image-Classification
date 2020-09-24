@@ -1,10 +1,20 @@
+GPUS: (0,)
+LOG_DIR: 'log/'
+DATA_DIR: ''
+OUTPUT_DIR: 'output/'
+WORKERS: 8
+PRINT_FREQ: 5
+
 MODEL:
   NAME: hrnet_alpha
+  IMAGE_SIZE: 
+    - 224
+    - 224
   INIT_WEIGHTS: true
   TARGET_TYPE: gaussian
-  #SEARCH:
-  #  SHARE_ALPHAS: false
-  #  USE_FUSE_ALPHA: true
+  SEARCH:
+    SHARE_ALPHAS: false
+    USE_FUSE_ALPHA: true
   EXTRA:
     PRETRAINED_LAYERS:
     - 'conv1'
@@ -70,8 +80,34 @@ MODEL:
       wh: 2
       reg: 2
     HEAD_CONV: 64
+CUDNN:
+  BENCHMARK: true
+  DETERMINISTIC: false
+  ENABLED: true
 DATASET:
-  ROOT: /home/data
-  TRAIN_SET: train
-  TEST_SET: val
-  DATASET: ILSVRC2015
+  ROOT: '/gdata/ImageNet2012'
+  TRAIN_SET: 'train'
+  TEST_SET: 'val'
+  DATASET: 'ImageNet2012'
+  DATA_FORMAT: 'jpg'
+TRAIN:
+  BATCH_SIZE_PER_GPU: 128
+  BEGIN_EPOCH: 0
+  END_EPOCH: 100
+  RESUME: true
+  LR_FACTOR: 0.1
+  LR_STEP:
+  - 30
+  - 60
+  - 90
+  OPTIMIZER: sgd
+  LR: 0.0001
+  WD: 0.0001
+  MOMENTUM: 0.9
+  NESTEROV: true
+  SHUFFLE: true
+TEST:
+  BATCH_SIZE_PER_GPU: 128
+  MODEL_FILE: ''
+DEBUG:
+  DEBUG: false

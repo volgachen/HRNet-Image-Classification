@@ -16,9 +16,6 @@ import torch
 from core.evaluate import accuracy
 
 
-logger = logging.getLogger(__name__)
-
-
 # reduce loss like in maskrcnn, however i am not sure about this function. It is not utilize yet.
 def reduce_loss(loss):
   world_size = torch.distributed.get_world_size()
@@ -40,6 +37,10 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    if to_output:
+        logger = logging.getLogger(__name__)
+        if torch.distributed.is_initialized():
+            print("Output at this rank", torch.distributed.get_rank())
 
     # switch to train mode
     model.train()
@@ -61,13 +62,12 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        # measure accuracy and record loss
-        loss = reduce_loss(loss)
-        losses.update(loss.item(), input.size(0))
-
         prec1, prec5 = accuracy(output, target, (1, 5))
 
+        # measure accuracy and record loss
+        if torch.distributed.is_initialized():
+            loss = reduce_loss(loss)
+        losses.update(loss.item(), input.size(0))
         top1.update(prec1[0], input.size(0))
         top5.update(prec5[0], input.size(0))
 
@@ -86,6 +86,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
                       epoch, i, len(train_loader), batch_time=batch_time,
                       speed=input.size(0)/batch_time.val,
                       data_time=data_time, loss=losses, top1=top1, top5=top5)
+            print(msg)
             logger.info(msg)
 
             if writer_dict:
@@ -103,6 +104,9 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
     top1 = AverageMeter()
     top5 = AverageMeter()
 
+    if to_output:
+        logger = logging.getLogger(__name__)
+        
     # switch to evaluate mode
     model.eval()
 
@@ -125,26 +129,34 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+        
+        if torch.distributed.is_initialized():
+            results = torch.cuda.FloatTensor([top1.sum, top5.sum, top1.count])
+            
+            torch.distributed.reduce(results, dst = 0)
+            top1_avg, top5_avg = results[0] / results[2], results[1] / results[2]
+        else:
+            top1_avg, top5_avg = top1.avg, top5.avg
 
         if to_output:
             msg = 'Test: Time {batch_time.avg:.3f}\t' \
                   'Loss {loss.avg:.4f}\t' \
                   'Error@1 {error1:.3f}\t' \
                   'Error@5 {error5:.3f}\t' \
-                  'Accuracy@1 {top1.avg:.3f}\t' \
-                  'Accuracy@5 {top5.avg:.3f}\t'.format(
-                      batch_time=batch_time, loss=losses, top1=top1, top5=top5,
-                      error1=100-top1.avg, error5=100-top5.avg)
+                  'Accuracy@1 {top1_avg:.3f}\t' \
+                  'Accuracy@5 {top5_avg:.3f}\t'.format(
+                      batch_time=batch_time, loss=losses, top1_avg=top1_avg, top5_avg=top5_avg,
+                      error1=100-top1_avg, error5=100-top5_avg)
             logger.info(msg)
 
             if writer_dict:
                 writer = writer_dict['writer']
                 global_steps = writer_dict['valid_global_steps']
                 writer.add_scalar('valid_loss', losses.avg, global_steps)
-                writer.add_scalar('valid_top1', top1.avg, global_steps)
+                writer.add_scalar('valid_top1', top1_avg, global_steps)
                 writer_dict['valid_global_steps'] = global_steps + 1
 
-    return top1.avg
+    return top1_avg
 
 
 class AverageMeter(object):

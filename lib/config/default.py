@@ -124,6 +124,10 @@ _C.DEBUG.SAVE_BATCH_IMAGES_PRED = False
 _C.DEBUG.SAVE_HEATMAPS_GT = False
 _C.DEBUG.SAVE_HEATMAPS_PRED = False
 
+# zychen: search
+_C.MODEL.SEARCH = CN()
+_C.MODEL.SEARCH.SHARE_ALPHAS = False
+_C.MODEL.SEARCH.USE_FUSE_ALPHA = True
 
 def update_config(cfg, args):
     cfg.defrost()

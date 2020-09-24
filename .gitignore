@@ -2,3 +2,7 @@
 __pycache__
 mpii
 ILSVRC2015
+ImageNet2012
+exp_pcl
+log
+output

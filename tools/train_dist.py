@@ -64,6 +64,10 @@ def parse_args():
                         help='testModel',
                         type=str,
                         default='')
+    parser.add_argument('--load_model',
+                        help='Weight to load',
+                        type=str,
+                        default='')
     parser.add_argument('--local_rank',
                         help='for distributed',
                         type=int)
@@ -88,6 +92,7 @@ def main():
             config, args.cfg, 'train')
 
         logger.info(pprint.pformat(args))
+        logger.info("This is config file")
         logger.info(pprint.pformat(config))
     else:
         final_output_dir, tb_log_dir = None, None
@@ -99,6 +104,8 @@ def main():
 
     model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(
         config)
+    if args.load_model:
+        model = models.load_model(model, args.load_model)
     model = model.cuda()
 
     if to_output:
@@ -132,6 +139,8 @@ def main():
     best_perf = 0.0
     best_model = False
     last_epoch = config.TRAIN.BEGIN_EPOCH
+    
+    '''
     if config.TRAIN.RESUME:
         model_state_file = os.path.join(final_output_dir,
                                         'checkpoint.pth.tar')
@@ -144,6 +153,7 @@ def main():
             logger.info("=> loaded checkpoint (epoch {})"
                         .format(checkpoint['epoch']))
             best_model = True
+    '''
             
     if isinstance(config.TRAIN.LR_STEP, list):
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -176,7 +186,7 @@ def main():
     train_sampler = DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=1,#config.TRAIN.BATCH_SIZE_PER_GPU, 
+        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU, 
         shuffle=False,
         sampler=train_sampler,
         num_workers=config.WORKERS,
@@ -196,7 +206,7 @@ def main():
     val_sampler = DistributedSampler(val_dataset, shuffle=False)
     valid_loader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=1,#config.TEST.BATCH_SIZE_PER_GPU,
+        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
         sampler=val_sampler,
         shuffle=False,
         num_workers=config.WORKERS,
@@ -204,21 +214,24 @@ def main():
     )
 
     for epoch in range(last_epoch, config.TRAIN.END_EPOCH):
+        if to_output:
+            print('Epoch %d start'%(epoch))
         lr_scheduler.step()
+        train_sampler.set_epoch(epoch)
         # train for one epoch
         train(config, train_loader, model, criterion, optimizer, epoch,
-              final_output_dir, tb_log_dir)
+              final_output_dir, tb_log_dir, to_output=to_output)
         # evaluate on validation set
         perf_indicator = validate(config, valid_loader, model, criterion,
-                                  final_output_dir, tb_log_dir)
-
-        if perf_indicator > best_perf:
-            best_perf = perf_indicator
-            best_model = True
-        else:
-            best_model = False
+                                  final_output_dir, tb_log_dir, to_output=to_output)
 
         if dist.get_rank() == 0:
+            if perf_indicator > best_perf:
+                best_perf = perf_indicator
+                best_model = True
+            else:
+                best_model = False
+                
             logger.info('=> saving checkpoint to {}'.format(final_output_dir))
             save_checkpoint({
                 'epoch': epoch + 1,

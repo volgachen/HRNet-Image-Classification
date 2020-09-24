@@ -317,7 +317,7 @@ class HighResolutionModule(nn.Module):
                         if self.multiply_prob:
                             y[ibranch] = y[ibranch] + probs[iblock][ibranch][inputs] * self.interactions[iblock][ibranch][inputs](x[inputs])
                         else:
-                            y[ibranch] = y[ibranch] + self.interactions[iblock][ibranch][inputs](x[inputs])
+                            y[ibranch] = y[ibranch] + self.interactions[iblock][ibranch][inputs](x[inputs]) * 0.5
             x = y
             ys.append(y)
         if self.conv1x1s is None:
@@ -910,7 +910,7 @@ def get_cls_net(num_layers, **kwargs):
   cfg.defrost()
   cfg.merge_from_file(config_file)
   cfg.freeze()
-  kwargs["alpha_file"]="/home/yszhu3/github/ctnet_new/exp/ctdet+entropy/coco_hrnetlink_0829entropy10/alpha_last.pth"#"/userhome/ctnet_model/v2.pth"
+  kwargs["alpha_file"]="/userhome/ctnet_model/v2.pth"#"/home/yszhu3/github/ctnet_new/exp/ctdet+entropy/coco_hrnetlink_0829entropy10/alpha_last.pth"#
   kwargs["alpha_thr"]=0.0
   model = HighResolutionNet(cfg['MODEL']['EXTRA'], cfg['MODEL']['SEARCH'], **kwargs)
   
@@ -922,7 +922,6 @@ def get_cls_net(num_layers, **kwargs):
     model.init_weights(cfg['MODEL']['PRETRAINED'])
 
   return model
-
 
 
 if __name__ == "__main__":

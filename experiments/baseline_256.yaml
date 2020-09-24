@@ -3,7 +3,7 @@ LOG_DIR: 'log/'
 DATA_DIR: ''
 OUTPUT_DIR: 'output/'
 WORKERS: 8
-PRINT_FREQ: 100
+PRINT_FREQ: 5
 
 MODEL: 
   NAME: cls_hrnet
@@ -83,7 +83,7 @@ TRAIN:
   - 60
   - 90
   OPTIMIZER: sgd
-  LR: 0.05
+  LR: 0.1
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
