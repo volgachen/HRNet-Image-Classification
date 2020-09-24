@@ -1,5 +1,5 @@
 GPUS: (0,)
-LOG_DIR: 'log/'
+LOG_DIR: 'log_tmp/'
 DATA_DIR: ''
 OUTPUT_DIR: 'output/'
 WORKERS: 8
@@ -91,7 +91,7 @@ DATASET:
   DATASET: 'ImageNet2012'
   DATA_FORMAT: 'jpg'
 TRAIN:
-  BATCH_SIZE_PER_GPU: 128
+  BATCH_SIZE_PER_GPU: 32
   BEGIN_EPOCH: 0
   END_EPOCH: 100
   RESUME: true
@@ -101,13 +101,13 @@ TRAIN:
   - 60
   - 90
   OPTIMIZER: sgd
-  LR: 0.0001
+  LR: 0.0125
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
 TEST:
-  BATCH_SIZE_PER_GPU: 128
+  BATCH_SIZE_PER_GPU: 32
   MODEL_FILE: ''
 DEBUG:
   DEBUG: false

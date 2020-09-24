@@ -29,6 +29,24 @@ def reduce_loss(loss):
   return reduce_loss
 
 
+def analysis_grad(model):
+    res = {}
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            res[name]={}
+            res[name]['shape']=param.grad.shape
+            res[name]['mean'], res[name]['std'], res[name]['mean_abs'], res[name]['max_abs'], res[name][' f_norm'], res[name]['1_norm'] = \
+                      param.grad.mean().item(), param.grad.std().item(), param.grad.abs().std().item(), param.grad.abs().max().item(), \
+                      torch.norm(param.grad).item(), torch.norm(param.grad, 1).item()
+            '''print(' --- mean --- ', param.grad.mean())
+            print(' --- std  --- ', param.grad.std())
+            print(' --- mean_abs  --- ', param.grad.abs().std())
+            print(' --- max_abs   --- ', param.grad.abs().max())
+            print(' --- f norm  --- ', torch.norm(param.grad))
+            print(' --- 1 norm   --- ', torch.norm(param.grad, 1))'''
+    return res
+
+
 def train(config, train_loader, model, criterion, optimizer, epoch,
           output_dir, tb_log_dir, writer_dict=None, to_output=True):
     batch_time = AverageMeter()
@@ -44,6 +62,9 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
 
     # switch to train mode
     model.train()
+    
+    # tmp: to analysis grad
+    grad_dict = {}
 
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
@@ -61,6 +82,11 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # compute gradient and do update step
         optimizer.zero_grad()
         loss.backward()
+        if i % 1 == 0:
+            grad_dict[i] = analysis_grad(model.module)
+            if i % 200 == 0:
+                torch.save(grad_dict, "grad_dict.pth")
+                print('Saved at', i)
         optimizer.step()
         prec1, prec5 = accuracy(output, target, (1, 5))
 
