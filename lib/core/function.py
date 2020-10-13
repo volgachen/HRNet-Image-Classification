@@ -82,11 +82,11 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # compute gradient and do update step
         optimizer.zero_grad()
         loss.backward()
-        if i % 1 == 0:
+        '''if i % 1 == 0:
             grad_dict[i] = analysis_grad(model.module)
             if i % 200 == 0:
                 torch.save(grad_dict, "grad_dict.pth")
-                print('Saved at', i)
+                print('Saved at', i)'''
         optimizer.step()
         prec1, prec5 = accuracy(output, target, (1, 5))
 

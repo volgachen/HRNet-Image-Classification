@@ -109,7 +109,7 @@ def main():
         'valid_global_steps': 0,
     }'''
 
-    gpus = list(config.GPUS)
+    gpus = list([0])#(config.GPUS)
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
     # define loss function (criterion) and optimizer
