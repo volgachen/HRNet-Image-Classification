@@ -125,7 +125,7 @@ def fill_fc_weights(layers):
 
 class HighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
-                 num_channels, multi_scale_output=True, alphas=None, multiply_prob=None, alpha_thr=0.5):
+                 num_channels, multi_scale_output=True, alphas=None, multiply_prob=None, alpha_thr=0.5, name=''):
         # zychen: a new parameter alphas added
         super(HighResolutionModule, self).__init__()
         self._check_branches(
@@ -168,6 +168,9 @@ class HighResolutionModule(nn.Module):
             self.conv1x1s = nn.ModuleList(self.conv1x1s)
         else:
             self.conv1x1s = None
+            
+        self.debug_dir = 'analysis/'
+        self.all_batch = None
                 
 
     # zychen: get architectural parameters
@@ -298,6 +301,14 @@ class HighResolutionModule(nn.Module):
             pass
         else:
             probs = torch.sigmoid(self.alphas)
+            
+        if self.debug_dir and self.all_batch is None:
+            self.all_batch = {}
+            for iblock in range(self.num_blocks[0]):
+                for ibranch in range(self.num_branches):
+                    self.all_batch["%d_%d"%(iblock, ibranch)] = []
+                    for inputs in range(self.num_branches):
+                        self.all_batch["%d_%d_%d"%(iblock, ibranch, inputs)] = []
 
         ys = [] #
         for iblock in range(self.num_blocks[0]):
@@ -308,6 +319,8 @@ class HighResolutionModule(nn.Module):
             y = []
             for ibranch in range(self.num_branches):
                 y.append(x[ibranch])
+                if self.debug_dir:
+                    self.all_batch["%d_%d"%(iblock, ibranch)].append(y[ibranch].abs().mean().item())
                 for inputs in range(self.num_branches):
                     # Input from the same resolution shouldn't be added
                     if inputs == ibranch:
@@ -317,12 +330,17 @@ class HighResolutionModule(nn.Module):
                         if self.multiply_prob:
                             y[ibranch] = y[ibranch] + probs[iblock][ibranch][inputs] * self.interactions[iblock][ibranch][inputs](x[inputs])
                         else:
-                            y[ibranch] = y[ibranch] + self.interactions[iblock][ibranch][inputs](x[inputs]) * 0.5
+                            to_add = self.interactions[iblock][ibranch][inputs](x[inputs]) * 0.5
+                            y[ibranch] = y[ibranch] + to_add
+                            if self.debug_dir:
+                                self.all_batch["%d_%d_%d"%(iblock, ibranch, inputs)].append(to_add.abs().mean().item())
             x = y
             ys.append(y)
         if self.conv1x1s is None:
             return x
         # adding code to process fusion inside one stage
+        if self.debug_dir and len(self.all_batch["0_0"]) == 200:
+            torch.save(self.all_batch, os.path.join(self.debug_dir, "feature_%s.pth"%(self.name)))
         outs = []
         for ibranch in range(len(ys[0])):
             out = torch.cat([ys[i][ibranch] for i in range(len(ys))], dim = 1)
@@ -629,7 +647,8 @@ class HighResolutionNet(nn.Module):
                                      reset_multi_scale_output,
                                      alphas=this_alpha,
                                      multiply_prob=self.multiply_prob,
-                                     alpha_thr=self.alpha_thr)
+                                     alpha_thr=self.alpha_thr,
+                                     name="stage%dblock%d"%(num_branches, i))
             )
             num_inchannels = modules[-1].get_num_inchannels()
 
