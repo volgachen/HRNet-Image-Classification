@@ -317,7 +317,7 @@ class HighResolutionModule(nn.Module):
                         if self.multiply_prob:
                             y[ibranch] = y[ibranch] + probs[iblock][ibranch][inputs] * self.interactions[iblock][ibranch][inputs](x[inputs])
                         else:
-                            y[ibranch] = y[ibranch] + self.interactions[iblock][ibranch][inputs](x[inputs])
+                            y[ibranch] = y[ibranch] + self.interactions[iblock][ibranch][inputs](x[inputs]) * 0.5
             x = y
             ys.append(y)
         if self.conv1x1s is None:
@@ -910,8 +910,8 @@ def get_cls_net(num_layers, **kwargs):
   cfg.defrost()
   cfg.merge_from_file(config_file)
   cfg.freeze()
-  kwargs["alpha_file"]="/userhome/ctnet_new/exp/ctdet+entropy/coco_hrnetv218_0924link/alpha_last.pth"#"/userhome/ctnet_model/v2.pth"#"/home/yszhu3/github/ctnet_new/exp/ctdet+entropy/coco_hrnetlink_0829entropy10/alpha_last.pth"#
-  kwargs["alpha_thr"]=0.5
+  kwargs["alpha_file"]="/userhome/ctnet_model/v2.pth"#"/home/yszhu3/github/ctnet_new/exp/ctdet+entropy/coco_hrnetlink_0829entropy10/alpha_last.pth"#
+  kwargs["alpha_thr"]=0.0
   model = HighResolutionNet(cfg['MODEL']['EXTRA'], cfg['MODEL']['SEARCH'], **kwargs)
   
   if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
